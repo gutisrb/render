@@ -4,175 +4,136 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SmartFlow • Virtuelno Opremanje</title>
-  <style>
-    * {box-sizing:border-box;margin:0;padding:0;}
-    body {font-family:sans-serif;background:#f7f9fc;color:#333;}
-    .container {max-width:800px;margin:40px auto;padding:0 20px;}
-    h1 {text-align:center;color:#2c3e50;margin-bottom:20px;}
-    .card {background:#fff;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
-    label {display:block;margin:15px 0 5px;font-weight:600;}
-    select, button {width:100%;padding:10px;font-size:1rem;border:1px solid #ccc;border-radius:4px;}
-    .upload-box {border:2px dashed #ccc;border-radius:4px;padding:30px;text-align:center;cursor:pointer;transition:.2s;}
-    .upload-box.drag-over {background:#e7fcf7;border-color:#2ecc71;}
-    .preview-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin:20px 0;}
-    .preview-item {background:#fff;border:1px solid #ddd;border-radius:4px;overflow:hidden;padding:6px;}
-    .preview-item img {width:100%;height:80px;object-fit:cover;border-radius:4px;}
-    .preview-item select {margin-top:6px;width:100%;font-size:.9rem;}
-    button:disabled {background:#ccc;cursor:not-allowed;}
-    .status {margin:15px 0;padding:10px;border-radius:4px;display:none;}
-    .status.error {background:#fde2e2;color:#721c24;border:1px solid #fabdbd;}
-    .status.info {background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb;}
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <h1>SmartFlow • Virtuelno Opremanje</h1>
-    <div class="card">
-      <label for="style-select">Stil nameštaja:</label>
-      <select id="style-select">
-        <option value="">— Izaberite stil —</option>
-        <option value="DT-INT-008">Skandinavski</option>
-        <option value="DT-INT-002">Moderan minimalistički</option>
-        <option value="DT-INT-014">Luksuzna spavaća</option>
-        <option value="DT-INT-017">Industrijski</option>
-      </select>
-
-      <label>Slike (max 10):</label>
-      <div class="upload-box" id="drop-area">
-        <p>Prevucite slike ovde ili kliknite</p>
-        <input type="file" id="file-input" accept="image/*" multiple style="display:none">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="container max-w-xl mx-auto p-4">
+    <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">SmartFlow • Virtuelno Opremanje</h1>
+    <form id="mainForm" class="bg-white p-6 rounded-lg shadow-md space-y-6" enctype="multipart/form-data" method="POST" action="YOUR_MAKE_WEBHOOK_URL">
+      <div>
+        <label for="stylePrompt" class="block font-semibold mb-2">Style Prompt</label>
+        <select id="stylePrompt" name="stylePrompt" class="w-full border border-gray-300 rounded px-3 py-2">
+          <option value="">— Izaberite stil —</option>
+          <option value="modern">Modern</option>
+          <option value="bohemian">Bohemian</option>
+          <option value="minimal">Minimal</option>
+          <option value="classic">Classic</option>
+          <option value="industrial">Industrial</option>
+        </select>
       </div>
-
-      <div class="preview-grid" id="preview-grid"></div>
-
-      <button id="run-btn" disabled>Generiši opremanje</button>
-      <div class="status info" id="status"></div>
-    </div>
+      <div>
+        <label for="file-input" class="block font-semibold mb-2">Slike (max 10)</label>
+        <div id="drop-area" class="upload-box border-2 border-dashed border-gray-300 rounded p-6 text-center cursor-pointer transition hover:bg-gray-50">
+          <p class="text-gray-500">Prevucite slike ovde ili kliknite</p>
+          <input type="file" id="file-input" name="images" accept="image/*" multiple class="hidden">
+        </div>
+      </div>
+      <div id="preview-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      <div>
+        <label for="roomType" class="block font-semibold mb-2">Tip prostorije</label>
+        <select id="roomType" name="roomType" class="w-full border border-gray-300 rounded px-3 py-2">
+          <option value="">— Tip prostorije —</option>
+          <option value="ST-INT-003">Dnevna soba</option>
+          <option value="ST-INT-001">Spavaća soba</option>
+          <option value="ST-INT-005">Kuhinja</option>
+          <option value="ST-INT-007">Kupatilo</option>
+          <option value="ST-INT-009">Kancelarija</option>
+          <option value="ST-INT-011">Trpezarija</option>
+        </select>
+      </div>
+      <button type="submit" id="run-btn" class="w-full bg-blue-600 text-white font-semibold py-2 rounded hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>Generiši opremanje</button>
+      <div id="status" class="hidden mt-2 text-center text-sm"></div>
+    </form>
+    <div id="result-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6"></div>
   </div>
-
   <script>
   (function(){
-    const WEBHOOK = 'https://hook.eu2.make.com/rcqkkybflqhtdml32kcod6h7ovrctmm8';
+    const WEBHOOK = 'YOUR_MAKE_WEBHOOK_URL';
     const MAX = 10;
-    let files = []; // { file, dataURL, roomType }
-
+    let files = [];
     const dropArea = document.getElementById('drop-area');
     const fileInput = document.getElementById('file-input');
     const preview = document.getElementById('preview-grid');
     const runBtn = document.getElementById('run-btn');
-    const styleSel = document.getElementById('style-select');
+    const stylePrompt = document.getElementById('stylePrompt');
+    const roomType = document.getElementById('roomType');
     const statusBox = document.getElementById('status');
+    const form = document.getElementById('mainForm');
+    const resultGrid = document.getElementById('result-grid');
 
-    // Helpers
     function showStatus(txt, isError=false){
       statusBox.textContent = txt;
-      statusBox.className = 'status ' + (isError?'error':'info');
+      statusBox.className = 'mt-2 text-center text-sm ' + (isError?'text-red-600':'text-blue-600');
       statusBox.style.display = 'block';
       if(!isError) setTimeout(()=> statusBox.style.display='none',3000);
     }
 
     function updateRunBtn(){
-      const ready = styleSel.value && files.length>0 && files.every(f=>f.roomType);
-      runBtn.disabled = !ready;
+      runBtn.disabled = !(stylePrompt.value && roomType.value && files.length>0);
     }
 
-    // Downscale to max 2048px, JPEG, 85% quality
-    async function downscale(file) {
-      const url = URL.createObjectURL(file);
-      const img = await new Promise(r=>{const i=new Image(); i.onload=()=>r(i); i.src=url;});
-      const maxDim = 2048;
-      const scale = Math.min(1, maxDim/Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      return new Promise(r=> canvas.toBlob(
-        blob => r(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type:'image/jpeg' })),
-        'image/jpeg', 0.85
-      ));
-    }
-
-    // File handling
     async function handleFiles(list){
       for(let f of list){
         if(!f.type.startsWith('image/')) continue;
         if(files.length>=MAX){ showStatus(`Max ${MAX} slika`, true); break; }
-        if(files.some(x=>x.file.name === f.name)) continue;
-
-        // Resize and convert
-        const resized = await downscale(f);
-        const obj = { file: resized, dataURL: '', roomType: '' };
-        files.push(obj);
-        const reader = new FileReader();
-        reader.onload = e => {
-          obj.dataURL = e.target.result;
-          renderPreview();
-          updateRunBtn();
-        };
-        reader.readAsDataURL(resized);
+        if(files.some(x=>x.name === f.name)) continue;
+        files.push(f);
       }
+      renderPreview();
+      updateRunBtn();
     }
 
     function renderPreview(){
       preview.innerHTML = '';
-      files.forEach((o,i)=>{
+      files.forEach((f,i)=>{
+        const url = URL.createObjectURL(f);
         const dom = document.createElement('div');
-        dom.className = 'preview-item';
-        dom.innerHTML = `
-          <img src="${o.dataURL}">
-          <select data-idx="${i}">
-            <option value="">— Tip prostorije —</option>
-            <option value="ST-INT-003">Dnevna soba</option>
-            <option value="ST-INT-001">Spavaća soba</option>
-            <option value="ST-INT-005">Kuhinja</option>
-            <option value="ST-INT-007">Kupatilo</option>
-            <option value="ST-INT-009">Kancelarija</option>
-            <option value="ST-INT-011">Trpezarija</option>
-          </select>
-        `;
-        dom.querySelector('select').addEventListener('change', e => {
-          files[i].roomType = e.target.value;
-          updateRunBtn();
-        });
+        dom.className = 'bg-white border rounded shadow p-2 flex flex-col items-center';
+        dom.innerHTML = `<img src="${url}" class="w-full h-32 object-cover rounded mb-2"><div class="text-xs text-gray-500 truncate">${f.name}</div>`;
         preview.append(dom);
       });
     }
 
     // Drag & drop & click
     ['dragenter','dragover'].forEach(ev=>{
-      dropArea.addEventListener(ev,e=>{ e.preventDefault(); dropArea.classList.add('drag-over'); });
+      dropArea.addEventListener(ev,e=>{ e.preventDefault(); dropArea.classList.add('bg-blue-50'); });
     });
     ['dragleave','drop'].forEach(ev=>{
       dropArea.addEventListener(ev,e=>{
-        e.preventDefault(); dropArea.classList.remove('drag-over');
+        e.preventDefault(); dropArea.classList.remove('bg-blue-50');
         if(ev==='drop') handleFiles(e.dataTransfer.files);
       });
     });
     dropArea.addEventListener('click', _=> fileInput.click());
     fileInput.addEventListener('change', e=> handleFiles(e.target.files));
 
-    // Send to webhook
-    runBtn.addEventListener('click', async ()=>{
+    // Enable button on input
+    stylePrompt.addEventListener('change', updateRunBtn);
+    roomType.addEventListener('change', updateRunBtn);
+
+    // Form submit
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
       runBtn.disabled = true;
       showStatus('Obrada u toku…');
-      const payload = {
-        stylePrompt: styleSel.value,
-        images: files.map(o=>({
-          name: o.file.name,
-          mime: o.file.type,
-          data: o.dataURL.split(',')[1],
-          roomType: o.roomType
-        }))
-      };
+      resultGrid.innerHTML = '';
+      const fd = new FormData();
+      fd.append('stylePrompt', stylePrompt.value);
+      fd.append('roomType', roomType.value);
+      files.forEach(f=> fd.append('images', f));
       try {
         const res = await fetch(WEBHOOK, {
           method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
+          body: fd
         });
         if(!res.ok) throw new Error(res.status+' '+res.statusText);
-        showStatus('Uspešno poslato!');
+        const data = await res.json();
+        if(Array.isArray(data.imageUrls)){
+          resultGrid.innerHTML = data.imageUrls.map(url=>`<div class='bg-white rounded shadow p-2'><img src='${url}' class='w-full h-40 object-cover rounded'></div>`).join('');
+          showStatus('Uspešno poslato!');
+        } else {
+          showStatus('Neočekivan odgovor servera.', true);
+        }
       } catch(err){
         console.error(err);
         showStatus('Greška: '+err.message, true);
@@ -180,9 +141,6 @@
         runBtn.disabled = false;
       }
     });
-
-    // Update on style change
-    styleSel.addEventListener('change', updateRunBtn);
   })();
   </script>
 </body>
